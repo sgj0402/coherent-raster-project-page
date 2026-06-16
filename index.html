@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="CoherentRaster: an efficient 3D Gaussian Splatting framework for real-time, high-resolution light field rendering on light field displays.">
+  <meta name="keywords" content="CoherentRaster, 3D Gaussian Splatting, 3DGS, Light Field Display, Light Field Rendering, Subpixel Rasterization, SIGGRAPH 2026">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CoherentRaster: Efficient 3D Gaussian Splatting for Light Field Displays</title>
+
+  <!-- Open Graph / social share. Update og:url and add static/images/og.png. -->
+  <meta property="og:title" content="CoherentRaster: Efficient 3D Gaussian Splatting for Light Field Displays">
+  <meta property="og:description" content="Real-time, high-resolution 3DGS light field rendering on consumer-grade hardware.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://sgj0402.github.io/coherent-raster-project-page/">
+  <meta property="og:image" content="./static/images/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <!-- .ico is the most reliable for browser tabs; SVG/PNG are progressive enhancements. -->
+  <link rel="icon" href="./static/images/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="./static/images/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="./static/images/favicon-32.png">
+  <link rel="apple-touch-icon" href="./static/images/apple-touch-icon.png">
+
+  <!-- Page-specific styling. Kept here so the borrowed index.css stays untouched. -->
+  <style>
+    /* Title scales down on small screens. */
+    @media (max-width: 768px) {
+      .publication-title.is-1 { font-size: 2rem; }
+    }
+
+    /* The method name in running text. */
+    .method-name { font-weight: 700; }
+
+    /* Venue line under the authors. */
+    .venue-line { margin-top: 0.6rem; color: #555; font-weight: 600; }
+
+    /* Author names keep on one line; linked names use the template's blue (index.css). */
+    .author-block { white-space: nowrap; }
+
+    /* Gentle separation between major sections. */
+    .section + .section { border-top: 1px solid #f1f1f1; }
+
+    /* Figures and captions. */
+    figure.fig { margin: 0; }
+    figure.fig img { display: block; width: 100%; border-radius: 8px; }
+    .caption {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #5a5a5a;
+      line-height: 1.55;
+      margin: 0.85rem auto 0;
+      max-width: 52rem;
+    }
+    .caption b { color: #363636; }
+
+    /* --- Scene carousel: exactly one video visible, no neighbour peeking --- */
+    .scene-carousel { position: relative; }
+    .scene-viewport {
+      overflow: hidden;
+      border-radius: 10px;
+      border: 1px solid #dcdcdc;
+    }
+    .scene-track {
+      display: flex;
+      transition: transform 0.45s ease;
+      will-change: transform;
+    }
+    .scene-slide { flex: 0 0 100%; min-width: 0; font-size: 0; }
+    .scene-video { width: 100%; height: auto; display: block; }
+
+    .scene-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 9999px;
+      background: rgba(31, 39, 51, 0.5);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease;
+      z-index: 4;
+    }
+    .scene-arrow:hover { background: rgba(31, 39, 51, 0.82); }
+    .scene-prev { left: 12px; }
+    .scene-next { right: 12px; }
+
+    .scene-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .scene-dots button {
+      width: 9px;
+      height: 9px;
+      padding: 0;
+      border: none;
+      border-radius: 9999px;
+      background: #c9ced6;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+    .scene-dots button.is-active {
+      background: hsl(204, 86%, 53%);
+      transform: scale(1.25);
+    }
+
+    @media (max-width: 768px) {
+      .scene-arrow { width: 36px; height: 36px; }
+    }
+
+    /* --- Results table: light, horizontal rules only --- */
+    .fps-table { width: 100%; border-collapse: collapse; }
+    .fps-table th, .fps-table td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid #ebebeb;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .fps-table thead th { border-bottom: 2px solid #cfd6e0; }
+    .fps-table td:first-child, .fps-table th:first-child { text-align: left; }
+    .fps-table tbody tr:hover { background: #fafbfd; }
+    .fps-table .ours-row { background: #eef4ff; font-weight: 700; }
+  </style>
+
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script defer src="./static/js/index.js"></script>
+</head>
+<body>
+
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="navMenu">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+  <div id="navMenu" class="navbar-menu">
+    <div class="navbar-start" style="flex-grow: 1; justify-content: center;">
+      <a class="navbar-item" href="#abstract">Abstract</a>
+      <a class="navbar-item" href="#method">Method</a>
+      <a class="navbar-item" href="#results">Results</a>
+      <a class="navbar-item" href="#BibTeX">BibTeX</a>
+    </div>
+  </div>
+</nav>
+
+
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">CoherentRaster: Efficient 3D Gaussian Splatting for Light Field Displays</h1>
+
+          <div class="is-size-5 publication-authors">
+            <!-- To link a name to a homepage, wrap it like:
+                 <span class="author-block"><a href="https://your-site.com">Gyujin Sim</a><sup>1</sup>,</span> -->
+            <span class="author-block">Gyujin Sim<sup>1</sup>,</span>
+            <span class="author-block"><a href="https://seungjooshin.github.io/">Seungjoo Shin</a><sup>1</sup>,</span>
+            <span class="author-block">Hosung Jeon<sup>2</sup>,</span>
+            <span class="author-block">Gwangsoon Lee<sup>2</sup>,</span>
+            <span class="author-block">Hyon-Gon Choo<sup>2</sup>,</span>
+            <span class="author-block"><a href="https://www.scho.pe.kr/">Sunghyun Cho</a><sup>1</sup>,</span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>POSTECH,</span>
+            <span class="author-block"><sup>2</sup>ETRI</span>
+          </div>
+
+          <div class="is-size-5 venue-line">SIGGRAPH 2026</div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- Paper PDF (arXiv). -->
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2605.04509"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <!-- arXiv. -->
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2605.04509"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="ai ai-arxiv"></i></span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+              <!-- Code. -->
+              <span class="link-block">
+                <a href="https://github.com/sgj0402/coherent-raster"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fab fa-github"></i></span>
+                  <span>Code</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Teaser: four scene loops. Exactly one is visible and playing at a time (see index.js). -->
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <div class="scene-carousel" id="scene-carousel">
+        <div class="scene-viewport">
+          <div class="scene-track">
+            <div class="scene-slide">
+              <video class="scene-video" muted loop playsinline preload="none">
+                <source src="./static/videos/scene1.mp4" type="video/mp4">
+              </video>
+            </div>
+            <div class="scene-slide">
+              <video class="scene-video" muted loop playsinline preload="none">
+                <source src="./static/videos/scene2.mp4" type="video/mp4">
+              </video>
+            </div>
+            <div class="scene-slide">
+              <video class="scene-video" muted loop playsinline preload="none">
+                <source src="./static/videos/scene3.mp4" type="video/mp4">
+              </video>
+            </div>
+            <div class="scene-slide">
+              <video class="scene-video" muted loop playsinline preload="none">
+                <source src="./static/videos/scene4.mp4" type="video/mp4">
+              </video>
+            </div>
+          </div>
+        </div>
+        <button class="scene-arrow scene-prev" type="button" aria-label="Previous scene">
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <button class="scene-arrow scene-next" type="button" aria-label="Next scene">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+        <div class="scene-dots"></div>
+      </div>
+      <h2 class="subtitle has-text-centered" style="margin-top: 1.25rem;">
+        <span class="method-name">CoherentRaster</span> renders high-resolution light field images
+        in real time.
+      </h2>
+    </div>
+  </div>
+</section>
+
+
+<section class="section" id="abstract">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Light field displays (LFDs) require rendering an interlaced image that encodes many
+            view-dependent observations. This multi-view requirement introduces substantial
+            computational overhead, making real-time rendering difficult to achieve. While 3D Gaussian
+            Splatting (3DGS) is efficient for single-view rendering on 2D displays, directly extending it
+            to LFDs is computationally expensive. Moreover, prior accelerations either suffer from GPU
+            inefficiency under spatially incoherent subpixel layouts or rely on computationally heavy
+            multi-plane intermediates. In this paper, we propose CoherentRaster, a 3DGS-based light field
+            rendering framework that performs subpixel-level rasterization. Our method employs Cross-view
+            Coherent Attribute Reuse to eliminate redundant computation across neighboring viewpoints and
+            applies View-coherent Remapping to restore warp-level memory efficiency degraded by the
+            interlaced subpixel layout. Together, CoherentRaster provides an efficient pipeline for
+            real-time, high-quality light field synthesis on consumer-grade hardware.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section" id="method">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Method</h2>
+
+    <!-- Pipeline figure (Fig.3). -->
+    <figure class="fig">
+      <img src="./static/images/pipeline.png" alt="CoherentRaster pipeline overview">
+    </figure>
+    <p class="caption">
+      Overview of the CoherentRaster pipeline. Cross-view Coherent Attribute Reuse
+      removes redundant per-view computation, and View-coherent Remapping restores coalesced memory
+      access during alpha blending.
+    </p>
+
+    <div class="columns is-centered" style="margin-top: 1.5rem;">
+      <div class="column is-four-fifths">
+        <div class="content has-text-justified">
+          <p>
+            CoherentRaster adapts the 3D Gaussian representation to the subpixel-level layout of light
+            field displays. Instead of rendering a full RGB image per viewpoint and then sampling
+            subpixels, it directly determines, for every subpixel, which Gaussians contribute and with
+            what color. Two strategies address the bottlenecks of this subpixel-level
+            pipeline.
+          </p>
+
+          <h3 class="title is-4">Cross-view Coherent Attribute Reuse</h3>
+          <p>
+            Neighboring viewpoints observe nearly the same scene content. We group adjacent views into
+            clusters and compute attributes which vary smoothly with viewpoints &mdash; 2D covariance, depth, and SH-based color
+            &mdash; once at each cluster's representative view, reusing them across the cluster. Only the
+            2D mean, which shifts noticeably with viewpoint, is computed per view. This sharply reduces
+            redundant per-view projection, key-generation, and sorting work.
+          </p>
+
+          <h3 class="title is-4">View-coherent Remapping</h3>
+          <p>
+            Because the lens geometry of LFDs interleaves viewpoints across the LF image, spatially adjacent
+            subpixels often belong to different views, breaking the memory coalescing that GPUs rely on.
+            We reorder the thread-to-subpixel mapping by viewpoint index through a precomputed lookup
+            table, so threads within a warp access the same or nearby Gaussian lists, restoring coalesced
+            memory access during alpha blending.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section" id="results">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Results</h2>
+
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+        <div class="content has-text-justified">
+          <p>
+            On an NVIDIA RTX 5090, CoherentRaster reaches up to 23 FPS for 4K (3840&times;2160) interlaced
+            outputs of real-world scenes with 71 viewpoints, and is the first method to enable real-time
+            rendering beyond 2K resolution for real-world 3D scenes. It achieves up to a 7.6&times; speedup
+            over a full-frame 3DGS pipeline while preserving high-fidelity rendering.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Qualitative comparison figure (Fig.4). -->
+    <figure class="fig">
+      <img src="./static/images/qualitative.png" alt="Qualitative comparison on the light field display">
+    </figure>
+    <p class="caption">
+      Photographs captured directly from the light field display. CoherentRaster matches
+      the full-frame baseline while running at real-time frame rates.
+    </p>
+
+    <!-- Rendering speed comparison (FPS), from the paper. -->
+    <div class="columns is-centered" style="margin-top: 2.5rem;">
+      <div class="column is-four-fifths">
+        <div class="table-container">
+          <table class="fps-table">
+            <thead>
+              <tr>
+                <th rowspan="2">Method</th>
+                <th colspan="2">Synthetic Blender</th>
+                <th colspan="2">Mip-NeRF 360</th>
+              </tr>
+              <tr>
+                <th>2K FPS</th><th>4K FPS</th><th>2K FPS</th><th>4K FPS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Full-Frame 3DGS</td><td>5.8</td><td>4.1</td><td>3.9</td><td>2.1</td></tr>
+              <tr><td>Full-Frame 3DGS (batch=36)</td><td>20</td><td>13</td><td>7.4</td><td>4.0</td></tr>
+              <tr><td>Subpixel-3DGS</td><td>28</td><td>19</td><td>11</td><td>5.7</td></tr>
+              <tr><td>MPI</td><td>0.8</td><td>0.4</td><td>0.8</td><td>0.4</td></tr>
+              <tr class="ours-row"><td>Ours</td><td>88</td><td>56</td><td>30</td><td>16</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="caption">
+          Rendering speed (FPS) against baselines on an RTX 5090.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title is-3">BibTeX</h2>
+    <pre><code>@misc{sim2026coherentrasterefficient3dgaussian,
+      title={CoherentRaster: Efficient 3D Gaussian Splatting for Light Field Displays}, 
+      author={Gyujin Sim and Seungjoo Shin and Hosung Jeon and Gwangsoon Lee and Hyon-Gon Choo and Sunghyun Cho},
+      year={2026},
+      eprint={2605.04509},
+      archivePrefix={arXiv},
+      primaryClass={cs.GR},
+      url={https://arxiv.org/abs/2605.04509}, 
+}</code></pre>
+  </div>
+</section>
+
+
+<footer class="footer">
+  <div class="container">
+    <div class="content has-text-centered">
+      <a class="icon-link" href="./static/pdfs/paper.pdf">
+        <i class="fas fa-file-pdf"></i>
+      </a>
+      <a class="icon-link" href="https://github.com/sgj0402/coherent-raster" class="external-link">
+        <i class="fab fa-github"></i>
+      </a>
+    </div>
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            This website is licensed under a <a rel="license"
+              href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
+            Commons Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+          <p>
+            This page was built from the <a href="https://nerfies.github.io/">Nerfies</a>
+            project page template. We thank the authors for releasing their source code.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
